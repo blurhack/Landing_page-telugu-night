@@ -57,22 +57,61 @@ export default function TeluguNightLanding() {
     return () => clearInterval(timer)
   }, [updateCountdown])
 
-  // Auto-play audio on component mount
+  // Auto-play audio on component mount - bypass all browser restrictions
   useEffect(() => {
     const playAudio = async () => {
       if (audioRef.current) {
         try {
-          audioRef.current.volume = 0.7
+          // Set properties to bypass autoplay restrictions
+          audioRef.current.muted = false
+          audioRef.current.volume = 0.8
+          audioRef.current.autoplay = true
+          audioRef.current.loop = true
+          
+          // Force play immediately
           await audioRef.current.play()
           setIsAudioPlaying(true)
+          setIsMuted(false)
         } catch (error) {
-          console.log("Auto-play was prevented by the browser:", error)
-          setIsAudioPlaying(false)
+          // If blocked, try with muted first then unmute
+          try {
+            audioRef.current.muted = true
+            await audioRef.current.play()
+            setIsAudioPlaying(true)
+            // Unmute after a short delay
+            setTimeout(() => {
+              if (audioRef.current) {
+                audioRef.current.muted = false
+                setIsMuted(false)
+              }
+            }, 1000)
+          } catch (secondError) {
+            console.log("Auto-play failed:", secondError)
+            setIsAudioPlaying(false)
+          }
         }
       }
     }
 
-    playAudio() // Remove setTimeout, play immediately
+    // Try to play immediately and also on any user interaction
+    playAudio()
+    
+    // Add event listeners for user interaction to ensure playback
+    const handleUserInteraction = () => {
+      if (audioRef.current && !isAudioPlaying) {
+        playAudio()
+      }
+    }
+    
+    document.addEventListener('click', handleUserInteraction, { once: true })
+    document.addEventListener('touchstart', handleUserInteraction, { once: true })
+    document.addEventListener('keydown', handleUserInteraction, { once: true })
+    
+    return () => {
+      document.removeEventListener('click', handleUserInteraction)
+      document.removeEventListener('touchstart', handleUserInteraction)
+      document.removeEventListener('keydown', handleUserInteraction)
+    }
   }, [])
 
   const togglePlayPause = useCallback(async () => {
@@ -119,8 +158,11 @@ export default function TeluguNightLanding() {
       {/* Background Audio */}
       <audio
         ref={audioRef}
+        autoPlay
+        muted={false}
         loop
         preload="auto"
+        playsInline
         onPlay={() => setIsAudioPlaying(true)}
         onPause={() => setIsAudioPlaying(false)}
         onEnded={() => setIsAudioPlaying(false)}
@@ -131,7 +173,9 @@ export default function TeluguNightLanding() {
         onLoadedData={() => {
           console.log("Audio loaded successfully")
           if (audioRef.current) {
-            audioRef.current.volume = 0.7
+            audioRef.current.volume = 0.8
+            // Try to play when loaded
+            audioRef.current.play().catch(console.log)
           }
         }}
       >
@@ -139,51 +183,16 @@ export default function TeluguNightLanding() {
         Your browser does not support the audio element.
       </audio>
 
-      {/* Audio Controls */}
-      <div className="fixed top-3 right-3 sm:top-4 sm:right-4 md:top-6 md:right-6 z-50 flex gap-2 sm:gap-3">
-        <button
-          onClick={togglePlayPause}
-          className="bg-zinc-900/90 backdrop-blur-sm border border-zinc-700/50 rounded-full p-2.5 sm:p-3 hover:bg-zinc-800/90 transition-colors duration-150 touch-manipulation"
-          aria-label={isAudioPlaying || isVideoPlaying ? "Pause audio and video" : "Play audio and video"}
+      {/* Song Suggestions Button */}
+      <div className="fixed top-3 right-3 sm:top-4 sm:right-4 md:top-6 md:right-6 z-50">
+        <a
+          href="https://docs.google.com/forms/d/e/1FAIpQLSeXkOqRQiqViyCEmW7NNksrl94633z9bfmtRnlhp0vL3vks-w/viewform"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-zinc-900/90 backdrop-blur-sm border border-zinc-700/50 rounded-full px-3 py-2 sm:px-4 sm:py-2.5 hover:bg-zinc-800/90 transition-colors duration-150 touch-manipulation text-white text-xs sm:text-sm font-medium"
         >
-          {isAudioPlaying || isVideoPlaying ? (
-            <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
-              <div className="flex gap-0.5 sm:gap-1">
-                <div className="w-1 h-3 sm:h-4 bg-white rounded-full"></div>
-                <div className="w-1 h-3 sm:h-4 bg-white rounded-full"></div>
-              </div>
-            </div>
-          ) : (
-            <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
-              <div className="w-0 h-0 border-l-[5px] sm:border-l-[6px] border-l-white border-t-[3px] sm:border-t-[4px] border-t-transparent border-b-[3px] sm:border-b-[4px] border-b-transparent ml-0.5"></div>
-            </div>
-          )}
-        </button>
-
-        <button
-          onClick={toggleMute}
-          className="bg-zinc-900/90 backdrop-blur-sm border border-zinc-700/50 rounded-full p-2.5 sm:p-3 hover:bg-zinc-800/90 transition-colors duration-150 touch-manipulation"
-          aria-label={isMuted ? "Unmute audio" : "Mute audio"}
-        >
-          {isMuted ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
-        </button>
-      </div>
-
-      {/* Floating Reserve Button - Always Visible */}
-      <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 z-[100] sm:w-auto sm:max-w-sm">
-        <Button
-          size="lg"
-          className="bg-white text-black hover:bg-white/95 active:bg-white/90 font-bold text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 rounded-full transition-all duration-200 tracking-tight font-[family-name:var(--font-poppins)] shadow-2xl border-0 touch-manipulation hover:scale-105 active:scale-95 w-full sm:w-auto"
-          style={{
-            boxShadow:
-              "0 10px 30px rgba(255, 255, 255, 0.3), 0 0 60px rgba(255, 255, 255, 0.2), 0 4px 20px rgba(0, 0, 0, 0.3)",
-          }}
-        >
-          <span className="flex items-center justify-center gap-2">
-            <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5" />
-            Reserve Your Spot - ₹300
-          </span>
-        </Button>
+          🎵 Add Song Suggestions
+        </a>
       </div>
 
       {/* Content */}
@@ -235,7 +244,7 @@ export default function TeluguNightLanding() {
                         "0 0 20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.9)",
                     }}
                   >
-                    TELUGU NIGHT
+                    తెలుగు NIGHT
                   </h1>
                   <div className="w-8 sm:w-12 md:w-16 h-0.5 bg-white/90 mx-auto mb-2 sm:mb-3 md:mb-4"></div>
                   <p
@@ -297,21 +306,6 @@ export default function TeluguNightLanding() {
             </div>
 
             {/* Pricing */}
-            <AnimatedSection animation="fadeIn" className="mb-6 sm:mb-8 md:mb-12">
-              <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-sm sm:max-w-md lg:max-w-lg mx-auto rounded-xl sm:rounded-2xl border transition-colors duration-200 bg-zinc-900/60 border-zinc-700/80 shadow-2xl backdrop-blur-sm">
-                <div className="flex items-center justify-center mb-3 sm:mb-4 md:mb-6">
-                  <IndianRupee className="w-5 sm:w-6 md:w-8 h-5 sm:h-6 md:h-8 text-white/90 mr-1 sm:mr-2" />
-                  <span className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight">300</span>
-                </div>
-                <p className="text-white/90 text-sm sm:text-base md:text-lg font-bold mb-1 sm:mb-2 md:mb-3 text-center font-[family-name:var(--font-poppins)]">
-                  Entry Pass
-                </p>
-                <p className="text-white/70 text-xs sm:text-sm text-center leading-relaxed px-2 font-bold font-[family-name:var(--font-poppins)]">
-                  Includes ₹200 cover charge redeemable for food & drinks
-                </p>
-              </div>
-            </AnimatedSection>
-
             {/* Countdown Timer */}
             <AnimatedSection animation="fadeUp">
               <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-xl sm:max-w-2xl mx-auto rounded-xl sm:rounded-2xl border transition-colors duration-200 bg-zinc-900/60 border-zinc-800/80 shadow-2xl backdrop-blur-sm">
@@ -409,24 +403,11 @@ export default function TeluguNightLanding() {
             <AnimatedSection animation="fadeUp">
               <div className="bg-zinc-900/60 backdrop-blur-sm rounded-xl sm:rounded-2xl p-8 sm:p-12 md:p-16 border border-zinc-800/80 shadow-2xl">
                 <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6 md:mb-8 tracking-tight font-[family-name:var(--font-poppins)]">
-                  Limited Capacity
+                  Join Us for an Amazing Night!
                 </h2>
                 <p className="text-base sm:text-lg md:text-xl text-white/80 mb-8 sm:mb-10 md:mb-12 max-w-2xl mx-auto">
-                  Secure your entry to this exclusive Telugu night experience
+                  Experience the best of Telugu music and culture
                 </p>
-
-                <div className="space-y-6 sm:space-y-8 md:space-y-10">
-                  <div className="bg-zinc-800/60 backdrop-blur-sm border border-zinc-700/80 rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 max-w-sm sm:max-w-md mx-auto">
-                    <div className="flex items-center justify-center mb-2 sm:mb-3 md:mb-4">
-                      <IndianRupee className="w-5 sm:w-6 h-5 sm:h-6 text-white/90 mr-1 sm:mr-2" />
-                      <span className="text-2xl sm:text-3xl font-bold text-white tracking-tight">300</span>
-                    </div>
-                    <p className="text-white/90 text-sm sm:text-base font-bold mb-1 sm:mb-2">Entry Pass</p>
-                    <p className="text-white/70 text-xs sm:text-sm">
-                      Includes ₹200 cover charge redeemable for food & drinks
-                    </p>
-                  </div>
-                </div>
               </div>
             </AnimatedSection>
           </div>
